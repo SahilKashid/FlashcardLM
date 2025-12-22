@@ -1,0 +1,5 @@
+{
+  "name": "FlashcardLM",
+  "description": "Advanced flashcard app with Gemini 3 Flash Thinking, Image Occlusion, and Spaced Repetition.",
+  "requestFramePermissions": []
+}
