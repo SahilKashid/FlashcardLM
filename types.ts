@@ -13,6 +13,11 @@ export interface OcclusionRect {
   height: number; // Percentage 0-100
 }
 
+export interface Folder {
+  id: string;
+  name: string;
+}
+
 export interface Flashcard {
   id: string;
   deckId: string;
@@ -28,6 +33,14 @@ export interface Deck {
   id: string;
   name: string;
   color: string;
+  folderId?: string;
+}
+
+export interface Deck {
+  id: string;
+  name: string;
+  color: string;
+  folderId?: string;
 }
 
 export interface GenerationStatus {

@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Deck, Flashcard } from './types';
+import { Deck, Flashcard, Folder } from './types';
 import DeckList from './components/DeckList';
 import ReviewSession from './components/ReviewSession';
 import CardGenerator from './components/CardGenerator';
 import ImageOcclusionEditor from './components/ImageOcclusionEditor';
 import CreateDeckModal from './components/CreateDeckModal';
+import CreateFolderModal from './components/CreateFolderModal';
 import ManualCardModal from './components/ManualCardModal';
 import MergeDeckModal from './components/MergeDeckModal';
+import MoveDeckModal from './components/MoveDeckModal';
 import ConfirmModal from './components/ConfirmModal';
 import { Sparkles, Plus, Image as ImageIcon, Github, FilePlus, Zap } from 'lucide-react';
 import { initialSRS } from './services/srsService';
@@ -15,21 +17,31 @@ import { initialSRS } from './services/srsService';
 interface AppData {
   decks: Deck[];
   cards: Flashcard[];
+  folders: Folder[];
 }
 
 type ConfirmAction = 
   | { type: 'deleteDeck'; id: string }
   | { type: 'resetDeck'; id: string }
+  | { type: 'deleteFolder'; id: string }
   | null;
 
 function App() {
   // --- State ---
-  const [data, setData] = useState<AppData>({ decks: [], cards: [] });
+  const [data, setData] = useState<AppData>({ decks: [], cards: [], folders: [] });
   const [view, setView] = useState<'home' | 'review' | 'generate' | 'occlusion'>('home');
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
   const [studyMode, setStudyMode] = useState<'standard' | 'cram'>('standard');
+  
+  // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingDeck, setEditingDeck] = useState<Deck | null>(null);
+  const [targetFolderId, setTargetFolderId] = useState<string | undefined>(undefined);
+
+  const [showFolderModal, setShowFolderModal] = useState(false);
+  const [editingFolder, setEditingFolder] = useState<Folder | null>(null);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [deckToMove, setDeckToMove] = useState<Deck | null>(null);
   
   // Card Modal State
   const [showCardModal, setShowCardModal] = useState(false);
@@ -40,15 +52,16 @@ function App() {
   // Confirmation State
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
 
-  // --- Handlers ---
+  // --- Deck Handlers ---
   const handleCreateDeck = (name: string) => {
     // Random color for the deck (Updated palette to remove purples)
     const colors = ['bg-rose-500', 'bg-orange-500', 'bg-amber-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500'];
     const color = colors[Math.floor(Math.random() * colors.length)];
 
-    const newDeck: Deck = { id: uuidv4(), name, color };
+    const newDeck: Deck = { id: uuidv4(), name, color, folderId: targetFolderId };
     setData(prev => ({ ...prev, decks: [...prev.decks, newDeck] }));
     setShowCreateModal(false);
+    setTargetFolderId(undefined);
   };
 
   const handleEditDeck = (deck: Deck) => {
@@ -73,6 +86,7 @@ function App() {
 
   const executeDeleteDeck = (id: string) => {
     setData(prev => ({
+      ...prev,
       decks: prev.decks.filter(d => d.id !== id),
       cards: prev.cards.filter(c => c.deckId !== id)
     }));
@@ -100,6 +114,64 @@ function App() {
     }));
   };
 
+  // --- Folder Handlers ---
+  const handleCreateFolder = (name: string) => {
+      const newFolder: Folder = { id: uuidv4(), name };
+      setData(prev => ({ ...prev, folders: [...prev.folders, newFolder] }));
+      setShowFolderModal(false);
+  };
+
+  const handleEditFolder = (folder: Folder) => {
+      setEditingFolder(folder);
+      setShowFolderModal(true);
+  };
+
+  const handleUpdateFolderName = (name: string) => {
+      if (editingFolder) {
+          setData(prev => ({
+              ...prev,
+              folders: prev.folders.map(f => f.id === editingFolder.id ? { ...f, name } : f)
+          }));
+          setEditingFolder(null);
+          setShowFolderModal(false);
+      }
+  };
+
+  const confirmDeleteFolder = (id: string) => {
+      setConfirmAction({ type: 'deleteFolder', id });
+  };
+
+  const executeDeleteFolder = (id: string) => {
+      setData(prev => {
+          // Identify decks within the folder
+          const decksToDelete = prev.decks.filter(d => d.folderId === id).map(d => d.id);
+          
+          return {
+              ...prev,
+              folders: prev.folders.filter(f => f.id !== id),
+              decks: prev.decks.filter(d => d.folderId !== id),
+              cards: prev.cards.filter(c => !decksToDelete.includes(c.deckId))
+          };
+      });
+  };
+
+  const openMoveDeckModal = (deck: Deck) => {
+      setDeckToMove(deck);
+      setShowMoveModal(true);
+  };
+
+  const handleMoveDeck = (folderId: string | undefined) => {
+      if (deckToMove) {
+          setData(prev => ({
+              ...prev,
+              decks: prev.decks.map(d => d.id === deckToMove.id ? { ...d, folderId } : d)
+          }));
+          setDeckToMove(null);
+          setShowMoveModal(false);
+      }
+  };
+
+  // --- Merge Handlers ---
   const handleMergeDecks = (deckIds: string[], newName: string) => {
     const newDeckId = uuidv4();
     const colors = ['bg-rose-500', 'bg-orange-500', 'bg-amber-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-sky-500', 'bg-blue-500'];
@@ -112,6 +184,7 @@ function App() {
     };
 
     setData(prev => ({
+        ...prev,
         decks: [
             ...prev.decks.filter(d => !deckIds.includes(d.id)),
             newDeck
@@ -123,6 +196,7 @@ function App() {
     setShowMergeModal(false);
   };
 
+  // --- Card Handlers ---
   const handleAddCards = (newCards: Flashcard[]) => {
     setData(prev => ({ ...prev, cards: [...prev.cards, ...newCards] }));
   };
@@ -187,6 +261,29 @@ function App() {
     link.click();
   };
 
+  const handleExportFolder = (folderId: string) => {
+    const folder = data.folders.find(f => f.id === folderId);
+    if (!folder) return;
+
+    const folderDecks = data.decks.filter(d => d.folderId === folderId);
+    const folderDeckIds = folderDecks.map(d => d.id);
+    const folderCards = data.cards.filter(c => folderDeckIds.includes(c.deckId));
+
+    const exportData = {
+        folders: [folder],
+        decks: folderDecks,
+        cards: folderCards
+    };
+
+    const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
+      JSON.stringify(exportData, null, 2)
+    )}`;
+    const link = document.createElement("a");
+    link.href = jsonString;
+    link.download = `${folder.name.replace(/\s+/g, '-').toLowerCase()}-folder-${new Date().toISOString().slice(0, 10)}.json`;
+    link.click();
+  };
+
   const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -205,12 +302,15 @@ function App() {
                         setData(prev => {
                             const newDecks = parsed.decks.filter((d: Deck) => !prev.decks.some(pd => pd.id === d.id));
                             const newCards = parsed.cards.filter((c: Flashcard) => !prev.cards.some(pc => pc.id === c.id));
+                            // Import folders if present, safely
+                            const newFolders = (parsed.folders || []).filter((f: Folder) => !prev.folders.some(pf => pf.id === f.id));
                             return {
                                 decks: [...prev.decks, ...newDecks],
-                                cards: [...prev.cards, ...newCards]
+                                cards: [...prev.cards, ...newCards],
+                                folders: [...prev.folders, ...newFolders]
                             };
                         });
-                        alert(`Import successful! Added ${parsed.decks.length} decks and ${parsed.cards.length} cards.`);
+                        alert(`Import successful! Added decks and cards.`);
                         e.target.value = '';
                     } else {
                         alert("Invalid JSON format.");
@@ -268,10 +368,12 @@ function App() {
                      const newDeck: Deck = {
                         id: deckId,
                         name: fileName.replace(/\.[^/.]+$/, "").replace(/[-_]/g, ' '),
-                        color
+                        color,
+                        folderId: targetFolderId // Support folder context on import? Not explicitly requested but good to note. For now defaults to undefined or needs more complex logic.
                      };
 
                      setData(prev => ({
+                        ...prev,
                         decks: [...prev.decks, newDeck],
                         cards: [...prev.cards, ...newCards]
                      }));
@@ -344,9 +446,11 @@ function App() {
         {view === 'home' && (
           <div className="h-full overflow-y-auto custom-scrollbar">
             <DeckList 
-                decks={data.decks} 
+                decks={data.decks}
+                folders={data.folders}
                 cards={data.cards} 
-                onCreateDeck={() => { setEditingDeck(null); setShowCreateModal(true); }}
+                onCreateDeck={(folderId) => { setTargetFolderId(folderId); setEditingDeck(null); setShowCreateModal(true); }}
+                onCreateFolder={() => { setEditingFolder(null); setShowFolderModal(true); }}
                 onSelectDeck={handleSelectDeck}
                 onDeleteDeck={confirmDeleteDeck}
                 onResetDeck={confirmResetDeck}
@@ -354,7 +458,11 @@ function App() {
                 onExportData={handleExportData}
                 onImportData={handleImportData}
                 onExportDeck={handleExportDeck}
+                onExportFolder={handleExportFolder}
                 onMergeClick={() => setShowMergeModal(true)}
+                onDeleteFolder={confirmDeleteFolder}
+                onEditFolder={handleEditFolder}
+                onMoveDeck={openMoveDeckModal}
             />
           </div>
         )}
@@ -404,6 +512,24 @@ function App() {
         />
       )}
 
+      {showFolderModal && (
+          <CreateFolderModal
+            onClose={() => { setShowFolderModal(false); setEditingFolder(null); }}
+            onCreate={editingFolder ? handleUpdateFolderName : handleCreateFolder}
+            initialName={editingFolder?.name}
+            title={editingFolder ? "Rename Folder" : "Create New Folder"}
+          />
+      )}
+
+      {showMoveModal && deckToMove && (
+          <MoveDeckModal
+            deck={deckToMove}
+            folders={data.folders}
+            onClose={() => { setShowMoveModal(false); setDeckToMove(null); }}
+            onMove={handleMoveDeck}
+          />
+      )}
+
       {showCardModal && activeDeckId && (
         <ManualCardModal 
             deckId={activeDeckId}
@@ -424,16 +550,25 @@ function App() {
       {confirmAction && (
           <ConfirmModal 
             isOpen={true}
-            title={confirmAction.type === 'deleteDeck' ? 'Delete Deck' : 'Reset Deck'}
-            message={confirmAction.type === 'deleteDeck' 
+            title={
+                confirmAction.type === 'deleteDeck' ? 'Delete Deck' : 
+                confirmAction.type === 'deleteFolder' ? 'Delete Folder' : 'Reset Deck'
+            }
+            message={
+                confirmAction.type === 'deleteDeck' 
                 ? "Are you sure you want to delete this deck? All flashcards inside it will be permanently lost."
+                : confirmAction.type === 'deleteFolder'
+                ? "Are you sure you want to delete this folder? All decks and flashcards inside it will be permanently lost."
                 : "Are you sure you want to reset all progress for this deck? All spaced repetition data will be reset to zero."
             }
-            confirmLabel={confirmAction.type === 'deleteDeck' ? 'Delete Forever' : 'Reset Progress'}
+            confirmLabel={
+                confirmAction.type === 'resetDeck' ? 'Reset Progress' : 'Delete Forever'
+            }
             isDestructive={true}
             onConfirm={() => {
                 if (confirmAction.type === 'deleteDeck') executeDeleteDeck(confirmAction.id);
                 if (confirmAction.type === 'resetDeck') executeResetDeck(confirmAction.id);
+                if (confirmAction.type === 'deleteFolder') executeDeleteFolder(confirmAction.id);
             }}
             onCancel={() => setConfirmAction(null)}
           />
