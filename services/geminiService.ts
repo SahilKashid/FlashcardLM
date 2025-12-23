@@ -72,6 +72,8 @@ export const generateCardsFromContent = async (input: ContentInput): Promise<Gen
                 Extract all key concepts, definitions, diagrams, and important details.
                 Pay special attention to text inside images, charts, and handwritten notes.
                 
+                CRITICAL INSTRUCTION: The data provided is crucial and any crucial data loss in making flashcards is fatal. You must capture every important detail.
+
                 Create high-quality flashcards.
                 ${formattingInstruction}
 
@@ -86,6 +88,8 @@ export const generateCardsFromContent = async (input: ContentInput): Promise<Gen
         Analyze the following text and create high-quality flashcards. 
         Focus on key concepts, definitions, and important details.
         
+        CRITICAL INSTRUCTION: The data provided is crucial and any crucial data loss in making flashcards is fatal. You must capture every important detail.
+
         Text content:
         """
         ${input.content}
