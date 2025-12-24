@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Deck, Flashcard, Folder } from './types';
+import { Deck, Flashcard, Folder, ReviewProgress } from './types';
 import DeckList from './components/DeckList';
 import ReviewSession from './components/ReviewSession';
 import CardGenerator from './components/CardGenerator';
@@ -32,6 +32,7 @@ function App() {
   const [view, setView] = useState<'home' | 'review' | 'generate' | 'occlusion'>('home');
   const [activeDeckId, setActiveDeckId] = useState<string | null>(null);
   const [studyMode, setStudyMode] = useState<'standard' | 'cram'>('standard');
+  const [reviewProgress, setReviewProgress] = useState<Record<string, ReviewProgress>>({});
   
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -233,11 +234,33 @@ function App() {
     setShowCardModal(true);
   };
 
+  // --- Progress Handler ---
+  const handleSaveProgress = (progress: ReviewProgress) => {
+      if (!activeDeckId) return;
+      setReviewProgress(prev => ({
+          ...prev,
+          [`${activeDeckId}-${studyMode}`]: progress
+      }));
+  };
+
+  const handleClearProgress = () => {
+    if (!activeDeckId) return;
+    setReviewProgress(prev => {
+        const newState = { ...prev };
+        delete newState[`${activeDeckId}-${studyMode}`];
+        return newState;
+    });
+  };
+
   // --- Import / Export Handlers ---
 
   const handleExportData = () => {
+    const exportPayload = {
+      ...data,
+      reviewProgress
+    };
     const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
-      JSON.stringify(data, null, 2)
+      JSON.stringify(exportPayload, null, 2)
     )}`;
     const link = document.createElement("a");
     link.href = jsonString;
@@ -249,8 +272,21 @@ function App() {
     const deck = data.decks.find(d => d.id === deckId);
     if (!deck) return;
     const deckCards = data.cards.filter(c => c.deckId === deckId);
+    
+    // Filter progress for this deck
+    const deckProgress: Record<string, ReviewProgress> = {};
+    Object.keys(reviewProgress).forEach(key => {
+        if (key.startsWith(deckId)) {
+            deckProgress[key] = reviewProgress[key];
+        }
+    });
+
     // Export structure compatible with full import
-    const exportData = { decks: [deck], cards: deckCards };
+    const exportData = { 
+        decks: [deck], 
+        cards: deckCards,
+        reviewProgress: deckProgress
+    };
     
     const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
       JSON.stringify(exportData, null, 2)
@@ -269,10 +305,19 @@ function App() {
     const folderDeckIds = folderDecks.map(d => d.id);
     const folderCards = data.cards.filter(c => folderDeckIds.includes(c.deckId));
 
+    const folderProgress: Record<string, ReviewProgress> = {};
+    Object.keys(reviewProgress).forEach(key => {
+        // key format is usually `deckId-mode`. We check if it starts with any of the deck IDs in this folder
+        if (folderDeckIds.some(id => key.startsWith(id))) {
+             folderProgress[key] = reviewProgress[key];
+        }
+    });
+
     const exportData = {
         folders: [folder],
         decks: folderDecks,
-        cards: folderCards
+        cards: folderCards,
+        reviewProgress: folderProgress
     };
 
     const jsonString = `data:text/json;chatset=utf-8,${encodeURIComponent(
@@ -310,6 +355,15 @@ function App() {
                                 folders: [...prev.folders, ...newFolders]
                             };
                         });
+
+                        // Import Progress
+                        if (parsed.reviewProgress) {
+                            setReviewProgress(prev => ({
+                                ...prev,
+                                ...parsed.reviewProgress
+                            }));
+                        }
+
                         alert(`Import successful! Added decks and cards.`);
                         e.target.value = '';
                     } else {
@@ -478,6 +532,9 @@ function App() {
             onFinish={() => setView('home')}
             onGenerate={() => setView('generate')}
             onOcclusion={() => setView('occlusion')}
+            initialProgress={reviewProgress[`${activeDeckId}-${studyMode}`]}
+            onSaveProgress={handleSaveProgress}
+            onClearProgress={handleClearProgress}
           />
         )}
 

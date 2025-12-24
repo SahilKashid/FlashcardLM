@@ -36,17 +36,16 @@ export interface Deck {
   folderId?: string;
 }
 
-export interface Deck {
-  id: string;
-  name: string;
-  color: string;
-  folderId?: string;
-}
-
 export interface GenerationStatus {
   totalChunks: number;
   processedChunks: number;
   isProcessing: boolean;
   error?: string;
   currentAction?: string;
+}
+
+export interface ReviewProgress {
+  cardIds: string[];
+  currentIndex: number;
+  isShuffled: boolean;
 }

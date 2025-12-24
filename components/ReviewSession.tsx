@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Flashcard, SRData } from '../types';
+import { Flashcard, SRData, ReviewProgress } from '../types';
 import { calculateNewSRS } from '../services/srsService';
 import ConfirmModal from './ConfirmModal';
 import { 
@@ -21,9 +21,24 @@ interface ReviewSessionProps {
   onFinish: () => void;
   onGenerate: () => void;
   onOcclusion: () => void;
+  initialProgress?: ReviewProgress;
+  onSaveProgress: (progress: ReviewProgress) => void;
+  onClearProgress: () => void;
 }
 
-const ReviewSession: React.FC<ReviewSessionProps> = ({ cards, studyMode, onUpdateCard, onDeleteCard, onEditCard, onFinish, onGenerate, onOcclusion }) => {
+const ReviewSession: React.FC<ReviewSessionProps> = ({ 
+    cards, 
+    studyMode, 
+    onUpdateCard, 
+    onDeleteCard, 
+    onEditCard, 
+    onFinish, 
+    onGenerate, 
+    onOcclusion,
+    initialProgress,
+    onSaveProgress,
+    onClearProgress
+}) => {
   const [queue, setQueue] = useState<Flashcard[]>([]);
   const [currentCardIndex, setCurrentCardIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
@@ -37,10 +52,7 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({ cards, studyMode, onUpdat
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
-  const sortedDeckCards = useMemo(() => {
-    return [...cards].sort((a, b) => a.createdAt - b.createdAt);
-  }, [cards]);
-
+  // Keep queue objects updated when cards prop changes (SR updates)
   useEffect(() => {
     if (queue.length > 0) {
       setQueue(prevQueue => prevQueue.map(q => {
@@ -50,8 +62,28 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({ cards, studyMode, onUpdat
     }
   }, [cards]);
 
+  // Initialization Logic
   useEffect(() => {
-    if (!isInitialized && cards.length > 0) {
+    if (isInitialized) return;
+
+    if (initialProgress) {
+        // Attempt to restore session
+        const restoredQueue = initialProgress.cardIds
+            .map(id => cards.find(c => c.id === id))
+            .filter((c): c is Flashcard => !!c); // Filter out deleted cards
+        
+        // Only restore if valid cards remain and we aren't past the end
+        if (restoredQueue.length > 0 && initialProgress.currentIndex < restoredQueue.length) {
+            setQueue(restoredQueue);
+            setCurrentCardIndex(initialProgress.currentIndex);
+            setIsShuffled(initialProgress.isShuffled);
+            setIsInitialized(true);
+            return;
+        }
+        // If restored session is invalid or finished, fall through to new session
+    }
+
+    if (cards.length > 0) {
         let cardsToReview: Flashcard[] = [];
 
         if (studyMode === 'cram') {
@@ -61,33 +93,24 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({ cards, studyMode, onUpdat
         }
 
         if (cardsToReview.length > 0) {
-            if (isShuffled) {
-                for (let i = cardsToReview.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [cardsToReview[i], cardsToReview[j]] = [cardsToReview[j], cardsToReview[i]];
-                }
-            } else {
-                cardsToReview.sort((a, b) => a.createdAt - b.createdAt);
-            }
+            // Default sort by creation
+            cardsToReview.sort((a, b) => a.createdAt - b.createdAt);
             setQueue(cardsToReview);
         }
-        setIsInitialized(true);
-    } else if (isInitialized && queue.length === 0 && cards.length > 0 && studyMode === 'standard') {
-         const dueCards = cards.filter(c => c.srs.dueDate <= Date.now());
-         if (dueCards.length > 0) {
-             if (isShuffled) {
-                for (let i = dueCards.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [dueCards[i], dueCards[j]] = [dueCards[j], dueCards[i]];
-                }
-             } else {
-                 dueCards.sort((a, b) => a.createdAt - b.createdAt);
-             }
-             setQueue(dueCards);
-             setCurrentCardIndex(0);
-         }
     }
-  }, [cards, isInitialized, queue.length, studyMode]);
+    setIsInitialized(true);
+  }, [cards, isInitialized, studyMode, initialProgress]);
+
+  // Auto-Save Progress
+  useEffect(() => {
+    if (isInitialized && queue.length > 0) {
+        onSaveProgress({
+            cardIds: queue.map(c => c.id),
+            currentIndex: currentCardIndex,
+            isShuffled: isShuffled
+        });
+    }
+  }, [queue, currentCardIndex, isShuffled, isInitialized, onSaveProgress]);
 
   const toggleShuffle = () => {
     if (queue.length === 0) return;
@@ -208,6 +231,14 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({ cards, studyMode, onUpdat
     }
   };
 
+  const handleRestart = () => {
+      onClearProgress();
+      setIsInitialized(false); // Trigger re-init
+      setQueue([]);
+      setCurrentCardIndex(0);
+      // Effectively resets the component state to force a new fetch of due cards
+  };
+
   if (cards.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-[70vh] text-center px-4">
@@ -250,7 +281,7 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({ cards, studyMode, onUpdat
     );
   }
 
-  if (queue.length === 0) {
+  if (queue.length === 0 && isInitialized) {
     return (
       <div className="flex flex-col items-center justify-center h-[60vh] text-center">
         <div className="bg-zinc-900/50 p-8 rounded-full mb-6">
@@ -268,14 +299,16 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({ cards, studyMode, onUpdat
                 <ArrowLeft size={20} /> Return to Library
             </button>
             {studyMode === 'standard' && (
-                <button onClick={() => window.location.reload()} className="text-zinc-500 hover:text-zinc-300 text-sm transition-all hover:scale-105 active:scale-95">
-                    Refresh
+                <button onClick={handleRestart} className="text-zinc-500 hover:text-zinc-300 text-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1">
+                    <RefreshCw size={14} /> Refresh
                 </button>
             )}
         </div>
       </div>
     );
   }
+
+  if (!isInitialized) return <div className="flex flex-col items-center justify-center h-[60vh]"><RefreshCw className="animate-spin text-emerald-500"/></div>;
 
   const currentCard = queue[currentCardIndex];
   if (!currentCard) return <div className="flex flex-col items-center justify-center h-[60vh]"><RefreshCw className="animate-spin text-emerald-500"/></div>;
@@ -285,8 +318,13 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({ cards, studyMode, onUpdat
   const handleRating = (rating: number) => {
     const updatedSrs = calculateNewSRS(currentCard.srs, rating);
     onUpdateCard({ ...currentCard, srs: updatedSrs });
-    if (isLastCard) onFinish();
-    else handleNext();
+    if (isLastCard) {
+        // Clear progress when finishing naturally so next session starts fresh
+        onClearProgress(); 
+        onFinish();
+    } else {
+        handleNext();
+    }
   };
 
   return (
