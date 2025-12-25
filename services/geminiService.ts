@@ -149,7 +149,7 @@ export const analyzeImageContext = async (base64Image: string): Promise<string> 
                         }
                     },
                     {
-                        text: "Identify the main object, diagram, or labels in this image. Provide the etymology and uses of the object and/or labels in a super friendly, easy-to-understand language. Keep it concise (under 150 words) and educational."
+                        text: "Identify the main object, diagram, or labels in this image. Provide the etymology and uses of the object and/or labels in a super friendly, easy-to-understand language. Keep it concise and educational."
                     }
                 ]
             }
