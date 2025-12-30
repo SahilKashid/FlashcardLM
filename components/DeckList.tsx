@@ -67,19 +67,19 @@ const DeckList: React.FC<DeckListProps> = ({
     <div className="p-6 max-w-5xl mx-auto">
       {/* Header & Breadcrumbs */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-        <div className="flex items-center gap-2 text-xl font-semibold text-zinc-100">
+        <div className="flex items-center gap-2 text-xl font-semibold text-zinc-100 min-w-0">
             <button 
                 onClick={() => setCurrentFolderId(null)}
-                className={`hover:text-emerald-400 transition-colors ${!currentFolderId ? 'text-white' : 'text-zinc-500'}`}
+                className={`hover:text-emerald-400 transition-colors whitespace-nowrap ${!currentFolderId ? 'text-white' : 'text-zinc-500'}`}
             >
                 Library
             </button>
             {currentFolder && (
                 <>
-                    <ChevronRight size={20} className="text-zinc-600" />
-                    <span className="flex items-center gap-2">
-                        <FolderOpen size={20} className="text-emerald-500" />
-                        {currentFolder.name}
+                    <ChevronRight size={20} className="text-zinc-600 shrink-0" />
+                    <span className="flex items-center gap-2 min-w-0">
+                        <FolderOpen size={20} className="text-emerald-500 shrink-0" />
+                        <span className="truncate">{currentFolder.name}</span>
                     </span>
                 </>
             )}
@@ -152,33 +152,35 @@ const DeckList: React.FC<DeckListProps> = ({
                 >
                 <div className="absolute top-0 left-0 w-1 h-full bg-blue-500 rounded-l-2xl"></div>
                 
-                <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3">
-                        <FolderIcon size={24} className="text-blue-500 fill-blue-500/10" />
-                        <h3 className="text-xl font-semibold text-zinc-100 group-hover:text-white transition-colors leading-tight break-words">
+                <div className="flex flex-col mb-4 gap-3">
+                    {/* Line 1: Icon and Name */}
+                    <div className="flex items-center gap-3 min-w-0 w-full">
+                        <FolderIcon size={24} className="text-blue-500 fill-blue-500/10 shrink-0" />
+                        <h3 className="text-xl font-semibold text-zinc-100 group-hover:text-white transition-colors leading-tight break-words line-clamp-2">
                             {folder.name}
                         </h3>
                     </div>
 
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    {/* Line 2: Actions */}
+                    <div className="flex gap-1">
                         <button
                             title="Export Folder"
                             onClick={(e) => { e.stopPropagation(); onExportFolder(folder.id); }}
-                            className="text-zinc-600 hover:text-emerald-400 transition-all p-2 rounded-lg hover:bg-zinc-800"
+                            className="text-zinc-500 hover:text-emerald-400 transition-all p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800"
                         >
                             <FileDown size={16} />
                         </button>
                         <button
                             title="Rename Folder"
                             onClick={(e) => { e.stopPropagation(); onEditFolder(folder); }}
-                            className="text-zinc-600 hover:text-blue-400 transition-all p-2 rounded-lg hover:bg-zinc-800"
+                            className="text-zinc-500 hover:text-blue-400 transition-all p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800"
                         >
                             <Pencil size={16} />
                         </button>
                         <button
                             title="Delete Folder"
                             onClick={(e) => { e.stopPropagation(); onDeleteFolder(folder.id); }}
-                            className="text-zinc-600 hover:text-red-400 transition-all p-2 rounded-lg hover:bg-zinc-800"
+                            className="text-zinc-500 hover:text-red-400 transition-all p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800"
                         >
                             <Trash2 size={16} />
                         </button>
@@ -186,11 +188,11 @@ const DeckList: React.FC<DeckListProps> = ({
                 </div>
 
                 <div className="mt-auto pt-4 flex items-center gap-4 text-sm text-zinc-500">
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-1.5 whitespace-nowrap">
                         <Zap size={14} className={due > 0 ? "text-amber-400" : "text-zinc-600"} />
                         {due} Due
                     </span>
-                    <span className="flex items-center gap-1.5">
+                    <span className="flex items-center gap-1.5 whitespace-nowrap">
                         <Sparkles size={14} className="text-zinc-600" />
                         {total} Cards
                     </span>
@@ -209,66 +211,71 @@ const DeckList: React.FC<DeckListProps> = ({
             >
               <div className={`absolute top-0 left-0 w-1 h-full ${deck.color} rounded-l-2xl`}></div>
               
-              <div className="flex justify-between items-start mb-4">
-                <h3 className="text-xl font-semibold text-zinc-100 group-hover:text-white transition-colors cursor-pointer pr-4 leading-tight break-words" onClick={() => onSelectDeck(deck.id, 'standard')}>
+              <div className="flex flex-col mb-4 gap-3">
+                {/* Line 1: Deck Name */}
+                <h3 
+                  className="text-xl font-semibold text-zinc-100 group-hover:text-white transition-colors cursor-pointer leading-tight break-words line-clamp-2 w-full" 
+                  onClick={() => onSelectDeck(deck.id, 'standard')}
+                >
                     {deck.name}
                 </h3>
 
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                {/* Line 2: Deck Actions */}
+                <div className="flex flex-wrap gap-1">
                      <button
                         title="Move to Folder"
                         onClick={(e) => { e.stopPropagation(); onMoveDeck(deck); }}
-                        className="text-zinc-600 hover:text-blue-400 transition-all p-2 rounded-lg hover:bg-zinc-800"
+                        className="text-zinc-500 hover:text-blue-400 transition-all p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800"
                     >
                         <MoveRight size={16} />
                     </button>
                      <button
                         title="Edit Deck Name"
                         onClick={(e) => { e.stopPropagation(); onEditDeck(deck); }}
-                        className="text-zinc-600 hover:text-emerald-400 transition-all p-2 rounded-lg hover:bg-zinc-800"
+                        className="text-zinc-500 hover:text-emerald-400 transition-all p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800"
                     >
                         <Pencil size={16} />
                     </button>
                     <button
                         title="Export Deck"
                         onClick={(e) => { e.stopPropagation(); onExportDeck(deck.id); }}
-                        className="text-zinc-600 hover:text-emerald-400 transition-all p-2 rounded-lg hover:bg-zinc-800"
+                        className="text-zinc-500 hover:text-emerald-400 transition-all p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800"
                     >
                         <FileDown size={16} />
                     </button>
                     <button
                         title="Reset Progress"
                         onClick={(e) => { e.stopPropagation(); onResetDeck(deck.id); }}
-                        className="text-zinc-600 hover:text-amber-400 transition-all p-2 rounded-lg hover:bg-zinc-800"
+                        className="text-zinc-500 hover:text-amber-400 transition-all p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800"
                     >
                         <RotateCcw size={16} />
                     </button>
                     <button
                         title="Delete Deck"
                         onClick={(e) => { e.stopPropagation(); onDeleteDeck(deck.id); }}
-                        className="text-zinc-600 hover:text-red-400 transition-all p-2 rounded-lg hover:bg-zinc-800"
+                        className="text-zinc-500 hover:text-red-400 transition-all p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800"
                     >
                         <Trash2 size={16} />
                     </button>
                 </div>
               </div>
 
-              {/* Action Buttons */}
+              {/* Action Buttons (Study/Cram) */}
               <div className="grid grid-cols-2 gap-2 mt-auto pt-4">
                 <button
                     onClick={() => onSelectDeck(deck.id, 'standard')}
                     className="flex items-center justify-center gap-2 bg-zinc-800 text-zinc-200 py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-zinc-700 active:scale-95"
                 >
                     <Play size={14} className={due > 0 ? "text-emerald-400" : "text-zinc-500"} />
-                    {due > 0 ? `Study (${due})` : 'Review'}
+                    <span className="truncate">{due > 0 ? `Study (${due})` : 'Review'}</span>
                 </button>
                 <button
                     onClick={() => onSelectDeck(deck.id, 'cram')}
                     className="flex items-center justify-center gap-2 bg-zinc-800 text-zinc-200 py-2.5 rounded-xl text-sm font-medium transition-all hover:bg-zinc-700 active:scale-95"
                     title="Study all cards immediately"
                 >
-                    <Zap size={14} className="text-amber-400" />
-                    Study All ({total})
+                    <Zap size={14} className="text-amber-400 shrink-0" />
+                    <span className="truncate">Study All ({total})</span>
                 </button>
               </div>
             </div>
