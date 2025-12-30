@@ -524,6 +524,7 @@ function App() {
         {view === 'review' && activeDeck && (
           <ReviewSession 
             key={`${activeDeckId}-${studyMode}`} // Force remount on mode change
+            deckName={activeDeck.name}
             cards={data.cards.filter(c => c.deckId === activeDeckId)}
             studyMode={studyMode}
             onUpdateCard={handleUpdateCard}

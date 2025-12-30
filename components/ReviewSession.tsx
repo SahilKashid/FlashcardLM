@@ -13,6 +13,7 @@ import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
 
 interface ReviewSessionProps {
+  deckName: string;
   cards: Flashcard[];
   studyMode: 'standard' | 'cram';
   onUpdateCard: (card: Flashcard) => void;
@@ -27,6 +28,7 @@ interface ReviewSessionProps {
 }
 
 const ReviewSession: React.FC<ReviewSessionProps> = ({ 
+    deckName,
     cards, 
     studyMode, 
     onUpdateCard, 
@@ -329,8 +331,8 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
 
   return (
     <div className="absolute inset-0 flex flex-col bg-zinc-950 overflow-hidden overscroll-none z-0">
-      {/* Internal Header: Back Button & Progress Bar - Removed border-b */}
-      <div className="shrink-0 h-14 flex items-center gap-4 px-4 bg-zinc-950 relative z-10">
+      {/* Redesigned Integrated Header: Back Button + Thick Status Bar */}
+      <div className="shrink-0 h-16 flex items-center gap-4 px-4 bg-zinc-950 relative z-10">
         <button 
             onClick={onFinish} 
             className="text-zinc-400 hover:text-white transition-colors p-2 -ml-2 rounded-full hover:bg-zinc-900"
@@ -342,13 +344,23 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
         <div 
             ref={progressBarRef}
             onClick={handleProgressClick}
-            className="flex-1 h-3 bg-zinc-800/50 rounded-full overflow-hidden cursor-pointer group relative"
+            className="flex-1 h-7 bg-zinc-800/50 rounded-full overflow-hidden cursor-pointer group relative shadow-inner"
             title="Jump to card"
         >
+             {/* Progress Fill */}
              <div 
-                className={`h-full transition-all duration-300 relative ${studyMode === 'cram' ? 'bg-amber-500 shadow-[0_0_12px_rgba(245,158,11,0.5)]' : 'bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]'}`}
+                className={`h-full transition-all duration-500 relative ${studyMode === 'cram' ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]'}`}
                 style={{ width: `${((currentCardIndex + 1) / queue.length) * 100}%` }}
             />
+            
+            {/* Deck Name Inside Bar */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
+                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] text-white truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
+                    {deckName}
+                </span>
+            </div>
+
+            {/* Hover overlay */}
             <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
         </div>
       </div>
