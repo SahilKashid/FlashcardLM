@@ -54,6 +54,8 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
+  const currentCard = queue[currentCardIndex];
+
   // Keep queue objects updated when cards prop changes (SR updates)
   useEffect(() => {
     if (queue.length > 0) {
@@ -152,6 +154,77 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
     }
   };
 
+  const handleRating = (rating: number) => {
+    if (!currentCard) return;
+    const updatedSrs = calculateNewSRS(currentCard.srs, rating);
+    onUpdateCard({ ...currentCard, srs: updatedSrs });
+    if (currentCardIndex === queue.length - 1) {
+        // Clear progress when finishing naturally so next session starts fresh
+        onClearProgress(); 
+        onFinish();
+    } else {
+        handleNext();
+    }
+  };
+
+  const revealAllOcclusions = () => {
+    if (currentCard?.occlusions) setVisibleOcclusions(currentCard.occlusions.map(o => o.id));
+    setIsFlipped(true);
+  };
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts if user is typing in an input or textarea
+      const activeElement = document.activeElement;
+      if (
+        activeElement instanceof HTMLInputElement || 
+        activeElement instanceof HTMLTextAreaElement || 
+        activeElement?.getAttribute('contenteditable') === 'true'
+      ) {
+        return;
+      }
+
+      switch (e.code) {
+        case 'Space':
+        case 'Enter':
+          e.preventDefault();
+          if (!isFlipped && currentCard) {
+            if (currentCard.type === 'basic') setIsFlipped(true);
+            else revealAllOcclusions();
+          }
+          break;
+        case 'ArrowRight':
+        case 'KeyD':
+          if (currentCardIndex < queue.length - 1) handleNext();
+          break;
+        case 'ArrowLeft':
+        case 'KeyA':
+          if (currentCardIndex > 0) handlePrev();
+          break;
+        case 'Digit1':
+        case 'Numpad1':
+          if (isFlipped) handleRating(1);
+          break;
+        case 'Digit2':
+        case 'Numpad2':
+          if (isFlipped) handleRating(3);
+          break;
+        case 'Digit3':
+        case 'Numpad3':
+          if (isFlipped) handleRating(4);
+          break;
+        case 'Digit4':
+        case 'Numpad4':
+          if (isFlipped) handleRating(5);
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isFlipped, currentCardIndex, queue.length, currentCard, handleRating, handleNext, handlePrev]);
+
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (!progressBarRef.current) return;
     const rect = progressBarRef.current.getBoundingClientRect();
@@ -167,6 +240,7 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
   };
 
   const executeDelete = () => {
+    if (!currentCard) return;
     const cardId = currentCard.id;
     onDeleteCard(cardId);
     const newQueue = queue.filter(c => c.id !== cardId);
@@ -179,7 +253,7 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
   };
 
   const handleEdit = () => {
-      onEditCard(currentCard);
+      if (currentCard) onEditCard(currentCard);
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -205,11 +279,6 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
     }
   };
 
-  const revealAllOcclusions = () => {
-    if (currentCard.occlusions) setVisibleOcclusions(currentCard.occlusions.map(o => o.id));
-    setIsFlipped(true);
-  };
-
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // Check if selecting text
     if (window.getSelection()?.toString()) return;
@@ -226,7 +295,7 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
         if (currentCardIndex < queue.length - 1) handleNext();
     } else {
         // Center -> Flip
-        if (!isFlipped) {
+        if (!isFlipped && currentCard) {
             if (currentCard.type === 'basic') setIsFlipped(true);
             else revealAllOcclusions();
         }
@@ -310,24 +379,7 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
     );
   }
 
-  if (!isInitialized) return <div className="flex flex-col items-center justify-center h-[60vh]"><RefreshCw className="animate-spin text-emerald-500"/></div>;
-
-  const currentCard = queue[currentCardIndex];
-  if (!currentCard) return <div className="flex flex-col items-center justify-center h-[60vh]"><RefreshCw className="animate-spin text-emerald-500"/></div>;
-
-  const isLastCard = currentCardIndex === queue.length - 1;
-
-  const handleRating = (rating: number) => {
-    const updatedSrs = calculateNewSRS(currentCard.srs, rating);
-    onUpdateCard({ ...currentCard, srs: updatedSrs });
-    if (isLastCard) {
-        // Clear progress when finishing naturally so next session starts fresh
-        onClearProgress(); 
-        onFinish();
-    } else {
-        handleNext();
-    }
-  };
+  if (!isInitialized || !currentCard) return <div className="flex flex-col items-center justify-center h-[60vh]"><RefreshCw className="animate-spin text-emerald-500"/></div>;
 
   return (
     <div className="absolute inset-0 flex flex-col bg-zinc-950 overflow-hidden overscroll-none z-0">
@@ -490,14 +542,14 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
          <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[50px]">
              {!isFlipped ? (
                 <p className="text-zinc-500 text-sm animate-pulse flex items-center gap-2">
-                    Tap card or spacebar to flip
+                    Tap card or <span className="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700 text-zinc-400 text-[10px] font-mono">SPACE</span> to flip
                 </p>
             ) : (
                 <div className="grid grid-cols-4 gap-2 md:gap-3 w-full max-w-2xl">
-                    <RatingButton rating={1} label="Again" color="bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20" onClick={() => handleRating(1)} />
-                    <RatingButton rating={3} label="Hard" color="bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20" onClick={() => handleRating(3)} />
-                    <RatingButton rating={4} label="Good" color="bg-sky-500/10 text-sky-400 border-sky-500/20 hover:bg-sky-500/20" onClick={() => handleRating(4)} />
-                    <RatingButton rating={5} label="Easy" color="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20" onClick={() => handleRating(5)} />
+                    <RatingButton rating={1} label="Again" shortcut="1" color="bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20" onClick={() => handleRating(1)} />
+                    <RatingButton rating={3} label="Hard" shortcut="2" color="bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20" onClick={() => handleRating(3)} />
+                    <RatingButton rating={4} label="Good" shortcut="3" color="bg-sky-500/10 text-sky-400 border-sky-500/20 hover:bg-sky-500/20" onClick={() => handleRating(4)} />
+                    <RatingButton rating={5} label="Easy" shortcut="4" color="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20" onClick={() => handleRating(5)} />
                 </div>
             )}
          </div>
@@ -517,14 +569,17 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
   );
 };
 
-const RatingButton: React.FC<{ rating: number, label: string, color: string, onClick: () => void }> = ({ rating, label, color, onClick }) => (
+const RatingButton: React.FC<{ rating: number, label: string, shortcut: string, color: string, onClick: () => void }> = ({ rating, label, shortcut, color, onClick }) => (
     <button 
         onClick={onClick}
-        className={`flex flex-col items-center justify-center py-3 rounded-xl border transition-all duration-200 active:scale-95 ${color}`}
+        className={`flex flex-col items-center justify-center py-3 rounded-xl border transition-all duration-200 active:scale-95 relative group ${color}`}
     >
         <span className="font-bold text-sm md:text-base">{label}</span>
         <span className="text-[10px] opacity-70 uppercase tracking-wider mt-0.5">
             {rating === 1 ? 'Reset' : rating === 3 ? 'Short' : rating === 4 ? 'Med' : 'Long'}
+        </span>
+        <span className="absolute -top-2 -right-2 bg-zinc-900 border border-zinc-700 text-zinc-500 text-[9px] w-4 h-4 flex items-center justify-center rounded-sm font-mono opacity-0 group-hover:opacity-100 transition-opacity">
+            {shortcut}
         </span>
     </button>
 );
