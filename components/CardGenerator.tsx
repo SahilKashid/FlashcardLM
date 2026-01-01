@@ -273,11 +273,11 @@ const CardGenerator: React.FC<CardGeneratorProps> = ({ deckId, onCardsGenerated,
             onChange={(e) => { setText(e.target.value); setMode('text'); }}
             readOnly={mode === 'pdf'}
             placeholder="Paste your notes here or upload files..."
-            className={`w-full h-48 bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-sm focus:outline-none focus:border-emerald-500 transition-colors resize-none text-zinc-300 scrollbar-thin ${mode === 'pdf' ? 'opacity-70 cursor-not-allowed' : ''}`}
+            className={`w-full h-48 bg-zinc-950 border border-zinc-800 rounded-xl p-4 text-sm focus:outline-none focus:border-emerald-500 transition-colors resize-none text-zinc-300 scrollbar-thin ${mode === 'pdf' ? 'opacity-70 cursor-not-allowed pr-36' : ''}`}
           />
           
           {mode === 'pdf' && (
-             <div className="absolute top-4 right-4 bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 border border-emerald-500/20">
+             <div className="absolute top-4 right-4 bg-emerald-500/10 text-emerald-400 px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 border border-emerald-500/20 shadow-sm z-10">
                 <ImageIcon size={12} /> VISUAL MODE
              </div>
           )}
