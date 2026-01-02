@@ -11,6 +11,8 @@ import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
 import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import remarkBreaks from 'remark-breaks';
 
 interface ReviewSessionProps {
   deckName: string;
@@ -55,6 +57,32 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
 
   const currentCard = queue[currentCardIndex];
+
+  // Helper to pre-process card content for better rendering
+  const formatCardContent = (content: string) => {
+    if (!content) return '';
+    
+    let formatted = content;
+
+    // 1. Identify literal \n sequences or other artifacts
+    // Replace literal '\n' string with actual newline
+    formatted = formatted.replace(/\\n/g, '\n');
+
+    // 2. Handle LaTeX special symbols inside math blocks
+    // Specifically escaping symbols like % that KaTeX interprets as a comment start.
+    // This looks for $...$ and $$...$$ blocks.
+    formatted = formatted.replace(/(\$\$?)([\s\S]+?)\1/g, (match, delimiter, mathContent) => {
+      // Inside math mode, %, &, and # must be escaped to be rendered correctly within \text{} or math environments.
+      // We escape them only if they are not already preceded by a backslash.
+      const escapedMath = mathContent
+        .replace(/(?<!\\)%/g, '\\%')
+        .replace(/(?<!\\)&/g, '\\&')
+        .replace(/(?<!\\)#/g, '\\#');
+      return `${delimiter}${escapedMath}${delimiter}`;
+    });
+
+    return formatted;
+  };
 
   // Keep queue objects updated when cards prop changes (SR updates)
   useEffect(() => {
@@ -403,7 +431,7 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
              <div 
                 className={`h-full transition-all duration-500 relative ${studyMode === 'cram' ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]'}`}
                 style={{ width: `${((currentCardIndex + 1) / queue.length) * 100}%` }}
-            />
+             />
             
             {/* Deck Name Inside Bar */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
@@ -477,10 +505,10 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
                                 <h3 className="text-sm uppercase text-zinc-500 font-bold tracking-widest mb-4">Question</h3>
                                 <div className="text-xl md:text-2xl font-medium text-zinc-100 leading-relaxed markdown-content">
                                     <ReactMarkdown 
-                                        remarkPlugins={[remarkMath, remarkGfm]} 
-                                        rehypePlugins={[[rehypeKatex, { strict: false }]]}
+                                        remarkPlugins={[remarkMath, remarkGfm, remarkBreaks]} 
+                                        rehypePlugins={[[rehypeRaw, { }] as any, [rehypeKatex, { strict: false }]]}
                                     >
-                                        {currentCard.front}
+                                        {formatCardContent(currentCard.front)}
                                     </ReactMarkdown>
                                 </div>
                             </div>
@@ -490,10 +518,10 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
                                     <h3 className="text-sm uppercase text-emerald-500 font-bold tracking-widest mb-4">Answer</h3>
                                     <div className="text-lg text-zinc-300 leading-relaxed markdown-content">
                                         <ReactMarkdown 
-                                            remarkPlugins={[remarkMath, remarkGfm]} 
-                                            rehypePlugins={[[rehypeKatex, { strict: false }]]}
+                                            remarkPlugins={[remarkMath, remarkGfm, remarkBreaks]} 
+                                            rehypePlugins={[[rehypeRaw, { }] as any, [rehypeKatex, { strict: false }]]}
                                         >
-                                            {currentCard.back}
+                                            {formatCardContent(currentCard.back)}
                                         </ReactMarkdown>
                                     </div>
                                 </div>
