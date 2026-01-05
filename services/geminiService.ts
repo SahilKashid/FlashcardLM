@@ -55,6 +55,12 @@ export const generateCardsFromContent = async (input: ContentInput): Promise<Gen
     - Use code blocks for programming code.
   `;
 
+  const dataCompletionInstruction = `
+    DATA COMPLETION INSTRUCTIONS:
+    - INTELLIGENT GAP FILLING: If you identify a list, category, or pattern in the provided data where some items are missing examples or details (e.g., a list of 3 items where only 2 have examples), you MUST use your own knowledge to fill in these gaps.
+    - The goal is to create complete and consistent flashcards, ensuring it matches the context.
+  `;
+
   if (input.type === 'image') {
     // Multimodal Input (Images + Prompt)
     const imageParts = input.content.map(b64 => ({
@@ -76,6 +82,7 @@ export const generateCardsFromContent = async (input: ContentInput): Promise<Gen
 
                 Create high-quality flashcards.
                 ${formattingInstruction}
+                ${dataCompletionInstruction}
 
                 Return a list of flashcards with 'front' (question) and 'back' (answer).
                 Ensure the questions are precise and the answers are comprehensive but concise.
@@ -97,6 +104,7 @@ export const generateCardsFromContent = async (input: ContentInput): Promise<Gen
         
         Create high-quality flashcards.
         ${formattingInstruction}
+        ${dataCompletionInstruction}
 
         Return a list of flashcards with 'front' (question) and 'back' (answer).
         Ensure the questions are precise and the answers are comprehensive but concise.
