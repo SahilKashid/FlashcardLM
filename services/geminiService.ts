@@ -34,6 +34,7 @@ export const chunkText = (text: string): string[] => {
 };
 
 export interface GeneratedCardData {
+  type: 'basic' | 'cloze';
   front: string;
   back: string;
 }
@@ -53,6 +54,15 @@ export const generateCardsFromContent = async (input: ContentInput): Promise<Gen
     - Inline math must be wrapped in single dollar signs.
     - Block math (on its own line) must be wrapped in double dollar signs.
     - Use code blocks for programming code.
+    
+    CARD TYPES:
+    - 'basic': Standard Question (front) and Answer (back).
+    - 'cloze': Fill-in-the-blank style. 
+      In the 'front' field, wrap the text to be hidden in double curly braces with a 'c' and a number.
+      Syntax: {{c1::hidden text}} or {{c1::hidden text::hint}}.
+      Example: "The {{c1::mitochondria}} is the powerhouse of the cell."
+      Use distinct numbers (c1, c2) for separate deletions, or the same number to hide multiple occurrences simultaneously.
+      The 'back' field is for extra context/notes shown after revealing.
   `;
 
   const dataCompletionInstruction = `
@@ -81,19 +91,18 @@ export const generateCardsFromContent = async (input: ContentInput): Promise<Gen
                 
                 CRITICAL INSTRUCTION: The data provided is crucial and any crucial data loss in making flashcards is fatal. You must capture every important detail.
 
-                Create high-quality flashcards.
+                Create high-quality flashcards (mix of basic and cloze where appropriate).
                 ${formattingInstruction}
                 ${dataCompletionInstruction}
 
-                Return a list of flashcards with 'front' (question) and 'back' (answer).
-                Ensure the questions are precise and the answers are comprehensive but concise.
+                Return a list of flashcards.
             `}
         ]
     };
   } else {
     // Text Input
     contents = `
-        Analyze the following text and create high-quality flashcards. 
+        Analyze the following text and create high-quality flashcards (mix of basic and cloze where appropriate). 
         Focus on key concepts, definitions, and important details.
         
         CRITICAL INSTRUCTION: The data provided is crucial and any crucial data loss in making flashcards is fatal. You must capture every important detail.
@@ -107,8 +116,7 @@ export const generateCardsFromContent = async (input: ContentInput): Promise<Gen
         ${formattingInstruction}
         ${dataCompletionInstruction}
 
-        Return a list of flashcards with 'front' (question) and 'back' (answer).
-        Ensure the questions are precise and the answers are comprehensive but concise.
+        Return a list of flashcards.
     `;
   }
 
@@ -125,10 +133,11 @@ export const generateCardsFromContent = async (input: ContentInput): Promise<Gen
           items: {
             type: Type.OBJECT,
             properties: {
+              type: { type: Type.STRING, description: "Must be 'basic' or 'cloze'" },
               front: { type: Type.STRING },
               back: { type: Type.STRING },
             },
-            required: ['front', 'back'],
+            required: ['type', 'front', 'back'],
           },
         },
       },

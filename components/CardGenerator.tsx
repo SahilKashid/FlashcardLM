@@ -222,16 +222,57 @@ const CardGenerator: React.FC<CardGeneratorProps> = ({ deckId, onCardsGenerated,
 
         const rawCards = await generateCardsFromContent(chunks[i]);
         
-        // Add index to baseTime to ensure unique and sequential timestamps
-        const newCards: Flashcard[] = rawCards.map((rc, idx) => ({
-          id: uuidv4(),
-          deckId,
-          type: 'basic',
-          front: rc.front,
-          back: rc.back,
-          srs: { ...initialSRS },
-          createdAt: baseTime + (i * 1000) + idx 
-        }));
+        const newCards: Flashcard[] = [];
+        
+        rawCards.forEach((rc, idx) => {
+            const cardId = uuidv4();
+            const createdAt = baseTime + (i * 1000) + idx;
+
+            if (rc.type === 'cloze') {
+                // Parse indices
+                const matches = [...rc.front.matchAll(/{{c(\d+)::/g)];
+                const indices = new Set(matches.map(m => parseInt(m[1])));
+                
+                if (indices.size > 0) {
+                    let offset = 0;
+                    indices.forEach(cIndex => {
+                        newCards.push({
+                            id: uuidv4(), // Unique ID per card variant
+                            deckId,
+                            type: 'cloze',
+                            front: rc.front,
+                            back: rc.back,
+                            srs: { ...initialSRS },
+                            createdAt: createdAt + offset, // slight offset to keep order
+                            clozeDeletionIndex: cIndex
+                        });
+                        offset++;
+                    });
+                } else {
+                    // Fallback to basic if regex fails but model said cloze
+                    newCards.push({
+                        id: cardId,
+                        deckId,
+                        type: 'basic',
+                        front: rc.front,
+                        back: rc.back,
+                        srs: { ...initialSRS },
+                        createdAt
+                    });
+                }
+            } else {
+                // Basic
+                newCards.push({
+                    id: cardId,
+                    deckId,
+                    type: 'basic', // Default to basic
+                    front: rc.front,
+                    back: rc.back,
+                    srs: { ...initialSRS },
+                    createdAt
+                });
+            }
+        });
 
         allGeneratedCards.push(...newCards);
       }
@@ -263,7 +304,7 @@ const CardGenerator: React.FC<CardGeneratorProps> = ({ deckId, onCardsGenerated,
       
       <p className="text-zinc-400 mb-6 text-sm">
         Upload files (PDF, Images, Text) or paste content. <br/>
-        <span className="text-emerald-400 text-xs">Now supports multiple files & scanned docs via Visual Analysis.</span>
+        <span className="text-emerald-400 text-xs">Now supports Visual Analysis and Cloze (fill-in-the-blank) generation.</span>
       </p>
 
       <div className="space-y-4">
