@@ -11,7 +11,7 @@ import ManualCardModal from './components/ManualCardModal';
 import MergeDeckModal from './components/MergeDeckModal';
 import MoveDeckModal from './components/MoveDeckModal';
 import ConfirmModal from './components/ConfirmModal';
-import { Sparkles, Plus, Image as ImageIcon, Github, FilePlus, Zap } from 'lucide-react';
+import { Sparkles, Plus, Image as ImageIcon, Github, FilePlus, Zap, BookOpen } from 'lucide-react';
 import { initialSRS } from './services/srsService';
 
 interface AppData {
@@ -209,11 +209,23 @@ function App() {
     }));
   };
 
-  const handleSaveCard = (card: Flashcard) => {
+  const handleSaveCard = (cards: Flashcard[]) => {
     if (editingCard) {
-      handleUpdateCard(card);
+      // If editing, we typically expect to update one card.
+      // However, if the user converted Basic -> Cloze and added multiple deletions,
+      // we might need to update the original card AND add new ones.
+      
+      const primaryCard = cards.find(c => c.id === editingCard.id);
+      const newCards = cards.filter(c => c.id !== editingCard.id);
+
+      if (primaryCard) {
+        handleUpdateCard(primaryCard);
+      }
+      if (newCards.length > 0) {
+        handleAddCards(newCards);
+      }
     } else {
-      handleAddCards([card]);
+      handleAddCards(cards);
     }
   };
 
@@ -329,7 +341,7 @@ function App() {
     link.click();
   };
 
-  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportData = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -450,44 +462,46 @@ function App() {
     <div className="h-screen flex flex-col bg-zinc-950 text-zinc-100 font-sans selection:bg-emerald-500/30 overflow-hidden">
       
       {/* Navbar - Fixed Height */}
-      <header className="shrink-0 bg-zinc-950/80 backdrop-blur-md z-40">
+      <header className="shrink-0 bg-zinc-950/90 backdrop-blur-xl z-40 border-b border-zinc-800/50">
         <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
           <div 
             className="flex items-center gap-3 cursor-pointer group"
             onClick={() => setView('home')}
           >
-            <div className="bg-zinc-900 border border-zinc-800 p-2.5 rounded-xl group-hover:border-emerald-500/50 group-hover:shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-all duration-300">
-                <Zap size={24} className="text-emerald-500 fill-emerald-500 group-hover:scale-110 transition-transform" />
+            <div className="bg-emerald-500 p-2 rounded-xl shadow-lg shadow-emerald-500/20 group-hover:shadow-emerald-500/40 transition-all duration-300 group-hover:scale-105">
+                <BookOpen size={20} className="text-zinc-950 fill-zinc-950" />
             </div>
             <div className="flex flex-col justify-center">
-                <span className="text-xl font-bold tracking-tight text-white leading-none">
-                    Flashcard<span className="text-emerald-500">LM</span>
+                <span className="text-lg font-bold tracking-tight text-white leading-none group-hover:text-emerald-400 transition-colors">
+                    Flashcard<span className="text-emerald-500 group-hover:text-emerald-400">LM</span>
                 </span>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
              {activeDeckId && view === 'review' && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 bg-zinc-900/50 p-1 rounded-xl border border-zinc-800/50">
                     <button 
                         onClick={openAddCardModal}
-                        className="flex items-center gap-2 text-sm font-medium bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg transition-all hover:scale-105 active:scale-95 text-zinc-300"
-                        title="Add Card"
+                        className="flex items-center gap-2 text-sm font-medium hover:bg-zinc-800 text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg transition-all"
+                        title="Add Manual Card"
                     >
-                        <FilePlus size={14} /> <span className="hidden sm:inline">Add</span>
+                        <FilePlus size={16} /> 
                     </button>
                     <div className="h-4 w-px bg-zinc-800 mx-1"></div>
                     <button 
                         onClick={() => setView('generate')}
-                        className="flex items-center gap-2 text-sm font-medium bg-zinc-900 border border-zinc-800 px-3 py-1.5 rounded-lg transition-all hover:scale-105 active:scale-95 text-emerald-400"
+                        className="flex items-center gap-2 text-sm font-medium hover:bg-zinc-800 text-emerald-400 hover:text-emerald-300 px-3 py-1.5 rounded-lg transition-all"
+                        title="AI Generation"
                     >
-                        <Sparkles size={14} /> <span className="hidden sm:inline">AI Generate</span>
+                        <Sparkles size={16} /> <span className="hidden sm:inline">Generate</span>
                     </button>
                     <button 
                         onClick={() => setView('occlusion')}
-                        className="flex items-center gap-2 text-sm font-medium bg-zinc-900 text-white border border-zinc-800 px-3 py-1.5 rounded-lg transition-all hover:scale-105 active:scale-95"
+                        className="flex items-center gap-2 text-sm font-medium hover:bg-zinc-800 text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg transition-all"
+                        title="Image Occlusion"
                     >
-                        <ImageIcon size={14} className="text-emerald-500" /> <span className="hidden sm:inline">Image Occlusion</span>
+                        <ImageIcon size={16} /> 
                     </button>
                 </div>
              )}
@@ -495,10 +509,10 @@ function App() {
         </div>
       </header>
 
-      {/* Main Content - Flex-1 Scrollable */}
-      <main className="flex-1 relative overflow-hidden">
+      {/* Main Content */}
+      <main className="flex-1 relative overflow-hidden flex flex-col">
         {view === 'home' && (
-          <div className="h-full overflow-y-auto custom-scrollbar">
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
             <DeckList 
                 decks={data.decks}
                 folders={data.folders}
@@ -540,7 +554,7 @@ function App() {
         )}
 
         {view === 'generate' && activeDeckId && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
                 <CardGenerator 
                     deckId={activeDeckId}
                     onCardsGenerated={handleAddCards}

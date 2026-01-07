@@ -58,6 +58,7 @@ export const generateCardsFromContent = async (input: ContentInput): Promise<Gen
   const dataCompletionInstruction = `
     DATA COMPLETION INSTRUCTIONS:
     - INTELLIGENT GAP FILLING: If you identify a list, category, or pattern in the provided data where some items are missing examples or details (e.g., a list of 3 items where only 2 have examples), you MUST use your own knowledge to fill in these gaps.
+    - GROUNDING: You are enabled to use Google Search. You must ONLY use it when you encounter incomplete data that requires external facts to fill in a gap (e.g., missing dates, missing names in a list). Do not use it if the text provides all necessary information.
     - The goal is to create complete and consistent flashcards, ensuring it matches the context.
   `;
 
@@ -116,7 +117,8 @@ export const generateCardsFromContent = async (input: ContentInput): Promise<Gen
       model: 'gemini-3-flash-preview',
       contents: contents,
       config: {
-        thinkingConfig: { thinkingBudget: 1024 },
+        thinkingConfig: { thinkingBudget: 2048 },
+        tools: [{ googleSearch: {} }],
         responseMimeType: 'application/json',
         responseSchema: {
           type: Type.ARRAY,

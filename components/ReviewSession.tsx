@@ -5,7 +5,8 @@ import ConfirmModal from './ConfirmModal';
 import { 
   ArrowLeft, RefreshCw, Plus, Sparkles, Image as ImageIcon, 
   Zap, Shuffle, ListOrdered, Settings2, 
-  Check, Trash2, Pencil, FileText
+  Check, Trash2, Pencil, FileText,
+  Eye, EyeOff, RotateCcw
 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -59,21 +60,35 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
   const currentCard = queue[currentCardIndex];
 
   // Helper to pre-process card content for better rendering
-  const formatCardContent = (content: string) => {
+  const formatCardContent = (content: string, type: 'basic' | 'cloze' = 'basic', clozeIndex?: number, isRevealed: boolean = false) => {
     if (!content) return '';
     
     let formatted = content;
 
+    // 0. Handle Cloze Deletions
+    if (type === 'cloze' && clozeIndex !== undefined) {
+        // Regex to match {{cN::Content::Hint}} or {{cN::Content}}
+        const clozeRegex = /{{c(\d+)::(.*?)(?:::(.*?))?}}/g;
+        
+        formatted = formatted.replace(clozeRegex, (match, index, text, hint) => {
+            if (parseInt(index) === clozeIndex) {
+                if (isRevealed) {
+                    return `<span class="cloze-revealed">${text}</span>`;
+                } else {
+                    const hintText = hint ? `[${hint}]` : '[...]';
+                    return `<span class="cloze-hidden" title="Show Answer">${hintText}</span>`;
+                }
+            } else {
+                return text;
+            }
+        });
+    }
+
     // 1. Identify literal \n sequences or other artifacts
-    // Replace literal '\n' string with actual newline
     formatted = formatted.replace(/\\n/g, '\n');
 
     // 2. Handle LaTeX special symbols inside math blocks
-    // Specifically escaping symbols like % that KaTeX interprets as a comment start.
-    // This looks for $...$ and $$...$$ blocks.
     formatted = formatted.replace(/(\$\$?)([\s\S]+?)\1/g, (match, delimiter, mathContent) => {
-      // Inside math mode, %, &, and # must be escaped to be rendered correctly within \text{} or math environments.
-      // We escape them only if they are not already preceded by a backslash.
       const escapedMath = mathContent
         .replace(/(?<!\\)%/g, '\\%')
         .replace(/(?<!\\)&/g, '\\&')
@@ -112,7 +127,6 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
             setIsInitialized(true);
             return;
         }
-        // If restored session is invalid or finished, fall through to new session
     }
 
     if (cards.length > 0) {
@@ -218,7 +232,7 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
         case 'Enter':
           e.preventDefault();
           if (!isFlipped && currentCard) {
-            if (currentCard.type === 'basic') setIsFlipped(true);
+            if (currentCard.type === 'basic' || currentCard.type === 'cloze') setIsFlipped(true);
             else revealAllOcclusions();
           }
           break;
@@ -308,7 +322,6 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
   };
 
   const handleCardClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    // Check if selecting text
     if (window.getSelection()?.toString()) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -316,15 +329,12 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
     const w = rect.width;
 
     if (x < w * 0.2) {
-        // Left Edge -> Prev
         if (currentCardIndex > 0) handlePrev();
     } else if (x > w * 0.8) {
-        // Right Edge -> Next
         if (currentCardIndex < queue.length - 1) handleNext();
     } else {
-        // Center -> Flip
         if (!isFlipped && currentCard) {
-            if (currentCard.type === 'basic') setIsFlipped(true);
+            if (currentCard.type === 'basic' || currentCard.type === 'cloze') setIsFlipped(true);
             else revealAllOcclusions();
         }
     }
@@ -332,16 +342,15 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
 
   const handleRestart = () => {
       onClearProgress();
-      setIsInitialized(false); // Trigger re-init
+      setIsInitialized(false);
       setQueue([]);
       setCurrentCardIndex(0);
-      // Effectively resets the component state to force a new fetch of due cards
   };
 
   if (cards.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-[70vh] text-center px-4">
-        <div className="bg-zinc-900/80 p-6 rounded-full mb-6 border border-zinc-800 shadow-xl">
+         <div className="bg-zinc-900/80 p-6 rounded-full mb-6 border border-zinc-800 shadow-xl">
             <Plus size={48} className="text-emerald-400" />
         </div>
         <h2 className="text-3xl font-bold text-white mb-3">This deck is empty</h2>
@@ -382,8 +391,8 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
 
   if (queue.length === 0 && isInitialized) {
     return (
-      <div className="flex flex-col items-center justify-center h-[60vh] text-center">
-        <div className="bg-zinc-900/50 p-8 rounded-full mb-6">
+      <div className="flex flex-col items-center justify-center h-[60vh] text-center animate-in fade-in duration-500">
+        <div className="bg-emerald-500/10 p-8 rounded-full mb-6 border border-emerald-500/20 shadow-lg shadow-emerald-900/20">
             <Check size={64} className="text-emerald-500" />
         </div>
         <h2 className="text-3xl font-bold text-white mb-2">All Caught Up!</h2>
@@ -393,13 +402,13 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
         <div className="flex flex-col gap-4 items-center">
             <button 
                 onClick={onFinish}
-                className="flex items-center gap-2 text-zinc-300 hover:text-white transition-all bg-zinc-800 px-6 py-3 rounded-xl font-medium hover:scale-105 active:scale-95"
+                className="flex items-center gap-2 text-white bg-zinc-800 hover:bg-zinc-700 px-6 py-3 rounded-xl font-medium hover:scale-105 active:scale-95 transition-all"
             >
                 <ArrowLeft size={20} /> Return to Library
             </button>
             {studyMode === 'standard' && (
                 <button onClick={handleRestart} className="text-zinc-500 hover:text-zinc-300 text-sm transition-all hover:scale-105 active:scale-95 flex items-center gap-1">
-                    <RefreshCw size={14} /> Refresh
+                    <RefreshCw size={14} /> Review All Anyway
                 </button>
             )}
         </div>
@@ -407,116 +416,118 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
     );
   }
 
-  if (!isInitialized || !currentCard) return <div className="flex flex-col items-center justify-center h-[60vh]"><RefreshCw className="animate-spin text-emerald-500"/></div>;
+  if (!isInitialized || !currentCard) return <div className="flex flex-col items-center justify-center h-[60vh]"><div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div></div>;
 
   return (
     <div className="absolute inset-0 flex flex-col bg-zinc-950 overflow-hidden overscroll-none z-0">
-      {/* Redesigned Integrated Header: Back Button + Thick Status Bar */}
-      <div className="shrink-0 h-16 flex items-center gap-4 px-4 bg-zinc-950 relative z-10">
+      
+      {/* Top Controls Bar */}
+      <div className="shrink-0 h-16 flex items-center gap-4 px-6 bg-zinc-950 z-20">
         <button 
             onClick={onFinish} 
-            className="text-zinc-400 hover:text-white transition-colors p-2 -ml-2 rounded-full hover:bg-zinc-900"
+            className="text-zinc-500 hover:text-white transition-colors p-2 -ml-2 rounded-full hover:bg-zinc-900"
             title="Return to Library"
         >
             <ArrowLeft size={20} />
         </button>
         
-        <div 
-            ref={progressBarRef}
-            onClick={handleProgressClick}
-            className="flex-1 h-7 bg-zinc-800/50 rounded-full overflow-hidden cursor-pointer group relative shadow-inner"
-            title="Jump to card"
-        >
-             {/* Progress Fill */}
+        {/* Progress Bar */}
+        <div className="flex-1 flex flex-col justify-center max-w-md mx-auto relative group">
+             <div className="flex justify-between text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-1.5">
+                <span>{currentCardIndex + 1} / {queue.length}</span>
+                <span className="truncate max-w-[150px]">{deckName}</span>
+             </div>
              <div 
-                className={`h-full transition-all duration-500 relative ${studyMode === 'cram' ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]'}`}
-                style={{ width: `${((currentCardIndex + 1) / queue.length) * 100}%` }}
-             />
-            
-            {/* Deck Name Inside Bar */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-4">
-                <span className="text-[10px] sm:text-xs font-bold uppercase tracking-[0.2em] text-white truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]">
-                    {deckName}
-                </span>
-            </div>
+                ref={progressBarRef}
+                onClick={handleProgressClick}
+                className="h-1.5 bg-zinc-800 rounded-full overflow-hidden cursor-pointer"
+             >
+                <div 
+                    className={`h-full transition-all duration-300 ease-out ${studyMode === 'cram' ? 'bg-amber-500' : 'bg-emerald-500'}`}
+                    style={{ width: `${((currentCardIndex + 1) / queue.length) * 100}%` }}
+                />
+             </div>
+        </div>
 
-            {/* Hover overlay */}
-            <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="flex items-center gap-2">
+            <button 
+                onClick={toggleShuffle} 
+                className={`p-2 rounded-lg transition-colors ${isShuffled ? 'text-emerald-400 bg-emerald-900/20' : 'text-zinc-500 hover:text-white hover:bg-zinc-900'}`}
+                title={isShuffled ? "Shuffle On" : "Sequential"}
+            >
+                    {isShuffled ? <Shuffle size={18} /> : <ListOrdered size={18} />}
+            </button>
+             <button 
+                onClick={(e) => { e.stopPropagation(); handleEdit(); }} 
+                className="p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-900 transition-colors"
+                title="Edit Card"
+            >
+                    <Pencil size={18} />
+            </button>
+                <button 
+                onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }} 
+                className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-zinc-900 transition-colors"
+                title="Delete Card"
+            >
+                    <Trash2 size={18} />
+            </button>
         </div>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex-1 overflow-hidden p-4 flex flex-col relative w-full max-w-4xl mx-auto">
+      {/* Main Card Area */}
+      <div className="flex-1 overflow-hidden p-4 md:p-6 flex flex-col relative w-full max-w-5xl mx-auto">
         <div 
-            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-3xl relative flex flex-col overflow-hidden shadow-2xl"
+            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-3xl relative flex flex-col overflow-hidden shadow-2xl shadow-black/50"
         >
-            {/* Card Internal Header (Overlay) */}
-            <div className="absolute top-0 left-0 w-full p-4 flex justify-between z-20 pointer-events-none">
-                {/* Left: Card Info */}
-                <div className="pointer-events-auto flex items-center gap-3 bg-zinc-950/60 backdrop-blur-md px-3 py-1.5 rounded-full border border-zinc-800/50 shadow-sm">
-                    {currentCard.type === 'basic' ? <FileText size={14} className="text-emerald-400"/> : <ImageIcon size={14} className="text-sky-400"/>}
-                    <div className="w-px h-3 bg-zinc-700" />
-                    
-                    <button 
-                        onClick={toggleShuffle} 
-                        className="text-zinc-400 hover:text-white transition-colors"
-                        title={isShuffled ? "Shuffle On" : "Sequential"}
-                    >
-                         {isShuffled ? <Shuffle size={14} className="text-emerald-400" /> : <ListOrdered size={14} />}
-                    </button>
-                    <div className="w-px h-3 bg-zinc-700" />
-                    
-                    <span className="text-xs font-mono text-zinc-300">
-                        {currentCardIndex + 1}<span className="text-zinc-600">/</span>{queue.length}
-                    </span>
-                </div>
-
-                {/* Right: Actions */}
-                <div className="pointer-events-auto flex gap-2">
-                    <button 
-                        onClick={(e) => { e.stopPropagation(); handleEdit(); }} 
-                        className="p-2 rounded-full bg-zinc-950/60 backdrop-blur-md border border-zinc-800/50 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all shadow-sm group"
-                        title="Edit Card & Parameters"
-                    >
-                         <Pencil size={16} />
-                    </button>
-                     <button 
-                        onClick={(e) => { e.stopPropagation(); setShowDeleteConfirm(true); }} 
-                        className="p-2 rounded-full bg-zinc-950/60 backdrop-blur-md border border-zinc-800/50 text-zinc-400 hover:text-red-400 hover:bg-zinc-800 transition-all shadow-sm"
-                        title="Delete Card"
-                    >
-                         <Trash2 size={16} />
-                    </button>
-                </div>
+            {/* Card Type Indicator */}
+            <div className="absolute top-4 left-4 z-20 pointer-events-none opacity-50">
+               {currentCard.type === 'basic' ? <FileText size={16} className="text-zinc-500"/> : 
+                currentCard.type === 'cloze' ? <Eye size={16} className="text-amber-500"/> :
+                <ImageIcon size={16} className="text-sky-500"/>}
             </div>
 
-            {/* Card Content - Scrollable */}
             <div 
-                className="flex-1 overflow-y-auto custom-scrollbar pt-16 pb-4"
+                className="flex-1 overflow-y-auto custom-scrollbar pt-12 pb-12 px-6"
                 onClick={handleCardClick}
                 onTouchStart={handleTouchStart}
                 onTouchMove={handleTouchMove}
                 onTouchEnd={handleTouchEnd}
             >
-                {currentCard.type === 'basic' ? (
-                    <div className="min-h-full flex flex-col items-center justify-center p-6 md:p-8 text-center">
-                        <div className="w-full max-w-2xl pointer-events-none"> 
-                            <div className="pointer-events-auto">
-                                <h3 className="text-sm uppercase text-zinc-500 font-bold tracking-widest mb-4">Question</h3>
-                                <div className="text-xl md:text-2xl font-medium text-zinc-100 leading-relaxed markdown-content">
+                {currentCard.type === 'basic' || currentCard.type === 'cloze' ? (
+                    <div className="min-h-full flex flex-col items-center justify-center text-center py-4">
+                        <div className="w-full max-w-3xl pointer-events-none"> 
+                            <div className="pointer-events-auto flex flex-col items-center">
+                                {/* Optional Image */}
+                                {currentCard.image && (
+                                    <div className="mb-8 w-full max-h-[350px] flex justify-center">
+                                        <img 
+                                            src={currentCard.image} 
+                                            alt="Visual Context" 
+                                            className="max-h-full rounded-xl border border-zinc-700 shadow-xl object-contain bg-black/20"
+                                        />
+                                    </div>
+                                )}
+
+                                <h3 className="text-xs uppercase text-zinc-500 font-bold tracking-[0.2em] mb-6">
+                                    {currentCard.type === 'cloze' ? 'Complete' : 'Question'}
+                                </h3>
+                                
+                                <div className="text-xl md:text-3xl font-medium text-zinc-100 leading-normal markdown-content selection:bg-emerald-500/30">
                                     <ReactMarkdown 
                                         remarkPlugins={[remarkMath, remarkGfm, remarkBreaks]} 
                                         rehypePlugins={[[rehypeRaw, { }] as any, [rehypeKatex, { strict: false }]]}
                                     >
-                                        {formatCardContent(currentCard.front)}
+                                        {formatCardContent(currentCard.front, currentCard.type, currentCard.clozeDeletionIndex, isFlipped)}
                                     </ReactMarkdown>
                                 </div>
                             </div>
                             
                             {(isFlipped) && (
-                                <div className="pt-8 border-t border-zinc-800 mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pointer-events-auto">
-                                    <h3 className="text-sm uppercase text-emerald-500 font-bold tracking-widest mb-4">Answer</h3>
-                                    <div className="text-lg text-zinc-300 leading-relaxed markdown-content">
+                                <div className="pt-10 border-t border-zinc-800 mt-10 animate-in fade-in slide-in-from-bottom-2 duration-300 pointer-events-auto">
+                                    <h3 className="text-xs uppercase text-emerald-500 font-bold tracking-[0.2em] mb-6">
+                                        {currentCard.type === 'cloze' ? 'Context' : 'Answer'}
+                                    </h3>
+                                    <div className="text-lg md:text-xl text-zinc-300 leading-relaxed markdown-content">
                                         <ReactMarkdown 
                                             remarkPlugins={[remarkMath, remarkGfm, remarkBreaks]} 
                                             rehypePlugins={[[rehypeRaw, { }] as any, [rehypeKatex, { strict: false }]]}
@@ -534,7 +545,7 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
                             <img 
                                 src={currentCard.front} 
                                 alt="Question" 
-                                className="max-h-[60vh] w-auto object-contain rounded-lg"
+                                className="max-h-[70vh] w-auto object-contain rounded-lg shadow-2xl"
                             />
                             {currentCard.occlusions?.map(occ => {
                                 const isRevealed = visibleOcclusions.includes(occ.id);
@@ -542,10 +553,10 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
                                     <button
                                         key={occ.id}
                                         onClick={(e) => { e.stopPropagation(); if(currentCard.type === 'image_occlusion' && !visibleOcclusions.includes(occ.id)) { setVisibleOcclusions(prev => [...prev, occ.id]); } }}
-                                        className={`absolute border-2 transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-95 ${
+                                        className={`absolute border-2 transition-all duration-200 cursor-pointer hover:scale-[1.02] active:scale-95 ${
                                             isRevealed 
-                                                ? 'bg-transparent border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]' 
-                                                : 'bg-sky-600/90 border-sky-400 hover:bg-sky-500'
+                                                ? 'bg-transparent border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.4)]' 
+                                                : 'bg-zinc-900/90 border-zinc-700 hover:bg-zinc-800'
                                         }`}
                                         style={{
                                             left: `${occ.x}%`,
@@ -565,25 +576,32 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
         </div>
       </div>
 
-      {/* Footer Area - Fixed Feedback UI - Removed top border */}
-      <div className="shrink-0 p-4 pb-8 bg-zinc-950 z-20">
-         <div className="max-w-4xl mx-auto flex items-center justify-center min-h-[50px]">
+      {/* Bottom Actions Area */}
+      <div className="shrink-0 pb-8 pt-2 px-6 bg-zinc-950 z-20">
+         <div className="max-w-3xl mx-auto flex items-center justify-center min-h-[64px]">
              {!isFlipped ? (
-                <p className="text-zinc-500 text-sm animate-pulse flex items-center gap-2">
-                    Tap card or <span className="px-1.5 py-0.5 bg-zinc-800 rounded border border-zinc-700 text-zinc-400 text-[10px] font-mono">SPACE</span> to flip
-                </p>
+                <div 
+                    onClick={() => {
+                        if (currentCard) {
+                            if (currentCard.type === 'basic' || currentCard.type === 'cloze') setIsFlipped(true);
+                            else revealAllOcclusions();
+                        }
+                    }}
+                    className="cursor-pointer text-zinc-500 text-sm animate-pulse flex items-center gap-3 px-6 py-3 rounded-xl hover:bg-zinc-900 transition-colors"
+                >
+                    Tap card or <span className="px-2 py-1 bg-zinc-800 rounded-md border border-zinc-700 text-zinc-400 text-xs font-mono">SPACE</span> to flip
+                </div>
             ) : (
-                <div className="grid grid-cols-4 gap-2 md:gap-3 w-full max-w-2xl">
-                    <RatingButton rating={1} label="Again" shortcut="1" color="bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20" onClick={() => handleRating(1)} />
-                    <RatingButton rating={3} label="Hard" shortcut="2" color="bg-amber-500/10 text-amber-400 border-amber-500/20 hover:bg-amber-500/20" onClick={() => handleRating(3)} />
-                    <RatingButton rating={4} label="Good" shortcut="3" color="bg-sky-500/10 text-sky-400 border-sky-500/20 hover:bg-sky-500/20" onClick={() => handleRating(4)} />
-                    <RatingButton rating={5} label="Easy" shortcut="4" color="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20" onClick={() => handleRating(5)} />
+                <div className="grid grid-cols-4 gap-3 w-full">
+                    <RatingButton rating={1} label="Again" shortcut="1" color="border-red-500/20 text-red-400 hover:bg-red-500/10" onClick={() => handleRating(1)} />
+                    <RatingButton rating={3} label="Hard" shortcut="2" color="border-amber-500/20 text-amber-400 hover:bg-amber-500/10" onClick={() => handleRating(3)} />
+                    <RatingButton rating={4} label="Good" shortcut="3" color="border-blue-500/20 text-blue-400 hover:bg-blue-500/10" onClick={() => handleRating(4)} />
+                    <RatingButton rating={5} label="Easy" shortcut="4" color="border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/10" onClick={() => handleRating(5)} />
                 </div>
             )}
          </div>
       </div>
 
-       {/* Delete Confirmation Modal Local */}
        <ConfirmModal 
         isOpen={showDeleteConfirm}
         title="Delete Flashcard"
@@ -600,14 +618,11 @@ const ReviewSession: React.FC<ReviewSessionProps> = ({
 const RatingButton: React.FC<{ rating: number, label: string, shortcut: string, color: string, onClick: () => void }> = ({ rating, label, shortcut, color, onClick }) => (
     <button 
         onClick={onClick}
-        className={`flex flex-col items-center justify-center py-3 rounded-xl border transition-all duration-200 active:scale-95 relative group ${color}`}
+        className={`flex flex-col items-center justify-center py-3 rounded-xl border bg-zinc-900 transition-all duration-200 active:scale-95 hover:-translate-y-1 ${color}`}
     >
-        <span className="font-bold text-sm md:text-base">{label}</span>
-        <span className="text-[10px] opacity-70 uppercase tracking-wider mt-0.5">
-            {rating === 1 ? 'Reset' : rating === 3 ? 'Short' : rating === 4 ? 'Med' : 'Long'}
-        </span>
-        <span className="absolute -top-2 -right-2 bg-zinc-900 border border-zinc-700 text-zinc-500 text-[9px] w-4 h-4 flex items-center justify-center rounded-sm font-mono opacity-0 group-hover:opacity-100 transition-opacity">
-            {shortcut}
+        <span className="font-bold text-sm">{label}</span>
+        <span className="text-[10px] opacity-60 uppercase tracking-wider mt-1 font-mono">
+            {rating === 1 ? '<1m' : rating === 3 ? '2d' : rating === 4 ? '5d' : '8d'}
         </span>
     </button>
 );

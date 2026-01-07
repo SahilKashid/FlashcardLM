@@ -21,10 +21,12 @@ export interface Folder {
 export interface Flashcard {
   id: string;
   deckId: string;
-  type: 'basic' | 'image_occlusion';
-  front: string; // Question or Image URL for occlusion
-  back: string; // Answer or extra notes for occlusion
+  type: 'basic' | 'image_occlusion' | 'cloze';
+  front: string; // Question, Image URL, or Raw Text for Cloze
+  back: string; // Answer, extra notes, or context
+  image?: string; // Base64 string for basic cards (visual context)
   occlusions?: OcclusionRect[]; // Only for image_occlusion
+  clozeDeletionIndex?: number; // Only for cloze, identifies which {{c#::}} to hide
   srs: SRData;
   createdAt: number;
 }
