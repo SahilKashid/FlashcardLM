@@ -191,8 +191,8 @@ const CardGenerator: React.FC<CardGeneratorProps> = ({ deckId, onCardsGenerated,
         chunks = chunkText(text).map(c => ({ type: 'text', content: c }));
     } else {
         // PDF Mode: Group pages to ensure detailed analysis
-        // 2 pages per chunk allows Gemini to focus on details in diagrams/scanned text
-        const PAGES_PER_CHUNK = 2; 
+        // 4 pages per chunk allows Gemini to focus on details in diagrams/scanned text
+        const PAGES_PER_CHUNK = 4; 
         for (let i = 0; i < pdfPages.length; i += PAGES_PER_CHUNK) {
             chunks.push({
                 type: 'image',
